@@ -207,7 +207,7 @@ def post_journal_entry(
         except json.JSONDecodeError:
             plugin_metadata = {}
 
-    plugin = PluginRegistry.get(plugin_id) if plugin_id else None
+    plugin = PluginRegistry.get_or_raise(plugin_id) if plugin_id else None
     context = PluginContext(
         tenant_id=str(payload.tenant_id),
         base_currency=tenant.base_currency,
