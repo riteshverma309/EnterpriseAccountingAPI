@@ -1,0 +1,6 @@
+#!/media/homelaptop/528801c9-3c0c-44c4-b1f9-c4a73405c35d/home/riteshverma/Documents/EnterpriseAccountingAPI/venv/bin/python
+import sys
+from pytest import console_main
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(console_main())

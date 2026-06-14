@@ -1,0 +1,42 @@
+Phase 1 — Infrastructure
+├── docker-compose.yml          PostgreSQL 16 + pgAdmin
+├── .env.example                Config template
+├── requirements.txt            Updated with pydantic-settings, alembic, httpx
+├── pyproject.toml              Pytest config
+└── README.md                   Quick start + architecture docs
+
+Phase 2 — Core Foundation  
+├── app/core/config.py          Pydantic-settings (DB URLs, pool config)
+└── app/core/database.py        SQLAlchemy engine + get_db() + ping_db()
+
+Phase 3 — ORM Models
+└── app/models/ledger.py        Tenant, Account (hierarchical CoA),
+                                JournalEntry (immutable), JournalLine
+                                — with DB-level CHECK/UNIQUE constraints
+
+Phase 4 — API Schemas
+└── app/schemas/ledger.py       Pydantic v2 DTOs — model_validator enforces
+                                double-entry at deserialization time
+
+Phase 5 — Plugin Architecture
+├── app/plugins/base.py         TaxPlugin, CurrencyPlugin, StatutoryReportPlugin,
+│                               LocalizationPlugin ABCs + PluginRegistry singleton
+├── app/plugins/us_gaap.py      US Sales Tax (state rates) + USD FX + 10-K stub
+├── app/plugins/eu_ifrs.py      EU VAT (per-country + reverse charge) + ECB FX + IAS-1 stub
+└── app/plugins/in_gst.py       CGST/SGST/IGST/Export + RBI FX + GSTR-1 stub
+
+Phase 6 — Service Layer
+├── app/services/ledger_service.py      SELECT FOR UPDATE locking, reversal engine
+└── app/services/reporting_service.py  Trial balance, balance sheet, statutory reports
+
+Phase 7 — API Routes
+├── app/api/v1/tenants.py
+├── app/api/v1/accounts.py
+├── app/api/v1/journal_entries.py
+├── app/api/v1/reports.py
+└── app/main.py                 Lifespan hooks, global exception handlers, CORS
+
+Phase 8 — Test Suite (60+ tests)
+├── tests/conftest.py           SAVEPOINT-based rollback fixtures, TestClient override
+├── tests/test_ledger.py        Double-entry, balance updates, immutability, reports
+└── tests/test_plugins.py       All 3 plugins — unit + HTTP integration tests
