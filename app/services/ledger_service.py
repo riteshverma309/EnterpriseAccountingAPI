@@ -27,6 +27,7 @@ from app.schemas.ledger import (
     JournalEntryCreate,
     TenantCreate,
 )
+from app.models.periods import FiscalPeriod
 
 
 # ── Custom Exceptions ─────────────────────────────────────────────────────────
@@ -40,6 +41,11 @@ class UnbalancedLedgerError(Exception):
             f"Double-entry violation: net variance = {variance}. "
             "Sum of all line amounts (DR positive, CR negative) must equal 0."
         )
+
+
+class ClosedPeriodError(Exception):
+    def __init__(self, date_val: str):
+        super().__init__(f"Cannot post entry: the accounting period for {date_val} is closed.")
 
 
 class TenantNotFoundError(Exception):
@@ -198,6 +204,21 @@ def post_journal_entry(
     tenant = db.get(Tenant, payload.tenant_id)
     if not tenant:
         raise TenantNotFoundError(str(payload.tenant_id))
+
+    # Step 1.5: Check Fiscal Periods
+    from datetime import datetime, timezone
+    current_date = datetime.now(timezone.utc).date()
+    closed_period = db.execute(
+        select(FiscalPeriod).where(
+            FiscalPeriod.tenant_id == payload.tenant_id,
+            FiscalPeriod.start_date <= current_date,
+            FiscalPeriod.end_date >= current_date,
+            FiscalPeriod.is_closed == True
+        )
+    ).scalar_one_or_none()
+    
+    if closed_period:
+        raise ClosedPeriodError(str(current_date))
 
     # Step 2: Build plugin context and invoke pre-post hook
     plugin_metadata: dict = {}

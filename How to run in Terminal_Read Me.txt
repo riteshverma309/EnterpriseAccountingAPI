@@ -1,0 +1,13 @@
+ 2001  source venv/bin/activate
+ 2002  python agent_system/cli.py
+ 2003  sudo docker exec accounting_postgres psql -U accounting_user -d enterprise_accounting -c "CREATE DATABASE enterprise_accounting_test;"
+ 2004  history
+(venv) homelaptop@homelaptop-HP-Laptop-15-bs1xx:/media/homelaptop/528801c9-3c0c-44c4-b1f9-c4a73405c35d/home/riteshverma/Documents/EnterpriseAccountingAPI$ sudo docker compose up -d
+[+] up 2/2
+ ✔ Container accounting_postgres Healthy                                                      0.5s
+ ✔ Container accounting_pgadmin  Started                                                      0.0s
+(venv) homelaptop@homelaptop-HP-Laptop-15-bs1xx:/media/homelaptop/528801c9-3c0c-44c4-b1f9-c4a73405c35d/home/riteshverma/Documents/EnterpriseAccountingAPI$ uvicorn app.main:app --reload
+
+Then access the API developed: 
+
+http://127.0.0.1:8000/docs#

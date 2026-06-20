@@ -48,6 +48,11 @@ def create_all_tables() -> None:
     """Create all tables defined in ORM models. Called at startup."""
     # Import models here to register them with Base.metadata
     from app.models import ledger  # noqa: F401
+    from app.models import periods  # noqa: F401
+    from app.models import invoicing  # noqa: F401
+    from app.models import banking  # noqa: F401
+    from app.models import fx  # noqa: F401
+    from app.models import assets  # noqa: F401
     Base.metadata.create_all(bind=engine)
 
 

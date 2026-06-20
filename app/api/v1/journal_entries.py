@@ -18,6 +18,7 @@ from app.services.ledger_service import (
     JournalEntryNotFoundError,
     TenantNotFoundError,
     UnbalancedLedgerError,
+    ClosedPeriodError,
 )
 
 router = APIRouter(prefix="/journal-entries", tags=["Journal Entries"])
@@ -60,6 +61,8 @@ def post_journal_entry(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
     except UnbalancedLedgerError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    except ClosedPeriodError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     return JournalEntryRead.model_validate(entry)

@@ -46,7 +46,11 @@ app/
 │   └── ledger.py        # Pydantic v2 DTOs with double-entry validator
 ├── services/
 │   ├── ledger_service.py    # Core engine: SELECT FOR UPDATE, balance updates
-│   └── reporting_service.py # Trial balance, balance sheet, statutory reports
+│   ├── reporting_service.py # Trial balance, balance sheet, statutory reports
+│   ├── invoicing_service.py # AR/AP, invoice to journal entry posting
+│   ├── banking_service.py   # Bank statement import and reconciliation
+│   ├── fx_service.py        # Multi-currency FX Revaluation
+│   └── assets_service.py    # Fixed Assets & Depreciation
 ├── plugins/
 │   ├── base.py          # ABCs: TaxPlugin, CurrencyPlugin, LocalizationPlugin
 │   ├── us_gaap.py       # US GAAP + Sales Tax + USD FX
@@ -56,7 +60,13 @@ app/
     ├── tenants.py        # POST/GET /api/v1/tenants/
     ├── accounts.py       # POST/GET /api/v1/accounts/
     ├── journal_entries.py # POST/GET /api/v1/journal-entries/ + /reverse
-    └── reports.py        # GET /api/v1/reports/trial-balance|balance-sheet|statutory
+    ├── reports.py        # GET /api/v1/reports/trial-balance|balance-sheet|statutory
+    ├── invoices.py       # POST/GET /api/v1/invoices/ + /post
+    ├── parties.py        # POST/GET /api/v1/parties/
+    ├── periods.py        # POST/PUT /api/v1/periods/
+    ├── banking.py        # POST/GET /api/v1/banking/statements + /reconcile
+    ├── fx.py             # POST /api/v1/fx/rates + /revalue
+    └── assets.py         # POST/GET /api/v1/assets/ + /depreciate
 ```
 
 ## Key Design Decisions
@@ -84,6 +94,18 @@ app/
 | GET | `/api/v1/reports/trial-balance/{tenant_id}` | Trial balance |
 | GET | `/api/v1/reports/balance-sheet/{tenant_id}` | Balance sheet |
 | GET | `/api/v1/reports/statutory/{tenant_id}/{plugin_id}` | Statutory report |
+| POST | `/api/v1/invoices/` | Create AR/AP Invoice |
+| POST | `/api/v1/invoices/{id}/post` | Post invoice to ledger |
+| POST | `/api/v1/parties/` | Create Customer/Vendor |
+| POST | `/api/v1/periods/` | Create Fiscal Period |
+| PUT  | `/api/v1/periods/{id}` | Close/Open Fiscal Period |
+| POST | `/api/v1/banking/statements` | Import Bank Statement |
+| GET  | `/api/v1/banking/statements/tenant/{id}` | List Bank Statements |
+| POST | `/api/v1/banking/reconcile` | Reconcile Bank Line to Journal Line |
+| POST | `/api/v1/fx/rates` | Set Exchange Rate |
+| POST | `/api/v1/fx/revalue` | Run Month-End FX Revaluation |
+| POST | `/api/v1/assets/` | Register Fixed Asset |
+| POST | `/api/v1/assets/depreciate` | Run Depreciation up to Date |
 
 ## Localization Plugins
 
