@@ -163,8 +163,18 @@ app.include_router(api_router, prefix="/api/v1")
 
 
 # ── System Endpoints ──────────────────────────────────────────────────────────
+@app.middleware("http")
+async def request_context_middleware(request: Request, call_next):
+    request.state.context = {
+        "tenant_id": request.headers.get("x-tenant-id"),
+        "organization_id": request.headers.get("x-organization-id"),
+        "branch_id": request.headers.get("x-branch-id"),
+    }
+    return await call_next(request)
+
+
 @app.get("/health", tags=["System"], summary="System health check")
-async def health_check():
+async def health_check(request: Request):
     """Returns operational status and registered plugin list."""
     from app.plugins.base import PluginRegistry
     db_ok = ping_db()
@@ -174,6 +184,7 @@ async def health_check():
         "version": settings.APP_VERSION,
         "database": "connected" if db_ok else "unreachable",
         "plugins": PluginRegistry.list_all(),
+        "context": getattr(request.state, "context", {}),
     }
 
 

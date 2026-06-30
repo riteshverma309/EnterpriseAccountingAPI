@@ -36,6 +36,41 @@ class TenantRead(_BaseSchema):
     created_at: datetime
 
 
+# ── Organizations / Branches ────────────────────────────────────────────────
+
+class OrganizationCreate(BaseModel):
+    tenant_id: uuid.UUID
+    name: str = Field(..., min_length=1, max_length=255)
+    country_code: str = Field("US", min_length=2, max_length=2)
+    base_currency: str = Field("USD", min_length=3, max_length=3)
+
+
+class OrganizationRead(_BaseSchema):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    name: str
+    country_code: str
+    base_currency: str
+    is_active: bool
+    created_at: datetime
+
+
+class BranchCreate(BaseModel):
+    organization_id: uuid.UUID
+    name: str = Field(..., min_length=1, max_length=255)
+    code: str = Field(..., min_length=1, max_length=20)
+
+
+class BranchRead(_BaseSchema):
+    id: uuid.UUID
+    tenant_id: uuid.UUID
+    organization_id: uuid.UUID
+    name: str
+    code: str
+    is_active: bool
+    created_at: datetime
+
+
 # ── Chart of Accounts ─────────────────────────────────────────────────────────
 
 class AccountCreate(BaseModel):

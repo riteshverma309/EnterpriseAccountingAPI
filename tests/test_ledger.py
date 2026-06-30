@@ -59,6 +59,47 @@ class TestTenantCRUD:
         assert data["is_active"] is True
         assert "id" in data
 
+    def test_create_organization_and_branch_success(self, client: TestClient, sample_tenant: dict):
+        """T002e: Organizations and branches can be created below a tenant."""
+        org_resp = client.post("/api/v1/organizations/", json={
+            "tenant_id": sample_tenant["id"],
+            "name": "Acme US",
+            "country_code": "US",
+            "base_currency": "USD",
+        })
+        assert org_resp.status_code == 201
+        org_data = org_resp.json()
+        assert org_data["name"] == "Acme US"
+
+        branch_resp = client.post("/api/v1/branches/", json={
+            "organization_id": org_data["id"],
+            "name": "New York Hub",
+            "code": "NYC",
+        })
+        assert branch_resp.status_code == 201
+        branch_data = branch_resp.json()
+        assert branch_data["name"] == "New York Hub"
+        assert branch_data["code"] == "NYC"
+
+    def test_health_endpoint_exposes_request_context(self, client: TestClient):
+        """T002f: Request headers should propagate scope information in the health payload."""
+        tenant_id = "11111111-1111-1111-1111-111111111111"
+        org_id = "22222222-2222-2222-2222-222222222222"
+        branch_id = "33333333-3333-3333-3333-333333333333"
+        resp = client.get(
+            "/health",
+            headers={
+                "x-tenant-id": tenant_id,
+                "x-organization-id": org_id,
+                "x-branch-id": branch_id,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["context"]["tenant_id"] == tenant_id
+        assert data["context"]["organization_id"] == org_id
+        assert data["context"]["branch_id"] == branch_id
+
     def test_list_tenants(self, client: TestClient, sample_tenant: dict):
         """T002b: List tenants returns at least one entry."""
         resp = client.get("/api/v1/tenants/")

@@ -80,9 +80,78 @@ class Tenant(Base):
     journal_entries = relationship(
         "JournalEntry", back_populates="tenant", cascade="all, delete-orphan"
     )
+    organizations = relationship(
+        "Organization", back_populates="tenant", cascade="all, delete-orphan"
+    )
+    branches = relationship(
+        "Branch", back_populates="tenant", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<Tenant id={self.id} name={self.name!r} currency={self.base_currency}>"
+
+
+class Organization(Base):
+    """Legal entity or subsidiary within a tenant."""
+    __tablename__ = "organizations"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = Column(String(255), nullable=False)
+    country_code = Column(String(2), nullable=False, default="US")
+    base_currency = Column(String(3), nullable=False, default="USD")
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "name", name="uq_organization_name_per_tenant"),
+        Index("ix_organizations_tenant_id", "tenant_id"),
+    )
+
+    tenant = relationship("Tenant", back_populates="organizations")
+    branches = relationship("Branch", back_populates="organization", cascade="all, delete-orphan")
+
+
+class Branch(Base):
+    """Sub-business or cost center tied to an organization."""
+    __tablename__ = "branches"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    tenant_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    organization_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizations.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = Column(String(255), nullable=False)
+    code = Column(String(20), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_at = Column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=lambda: datetime.now(timezone.utc),
+    )
+
+    __table_args__ = (
+        UniqueConstraint("organization_id", "code", name="uq_branch_code_per_organization"),
+        Index("ix_branches_tenant_id", "tenant_id"),
+        Index("ix_branches_organization_id", "organization_id"),
+    )
+
+    tenant = relationship("Tenant", back_populates="branches")
+    organization = relationship("Organization", back_populates="branches")
 
 
 class Account(Base):

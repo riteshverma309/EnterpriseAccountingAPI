@@ -23,6 +23,17 @@ uvicorn app.main:app --reload
 # http://localhost:5050 (pgAdmin — admin@accounting.local / admin123)
 ```
 
+### Request context headers
+
+The API now accepts request-scoped context headers for multi-organization access:
+
+```bash
+curl -X GET http://localhost:8000/health \
+  -H "x-tenant-id: <tenant-id>" \
+  -H "x-organization-id: <organization-id>" \
+  -H "x-branch-id: <branch-id>"
+```
+
 ## Running Tests
 
 ```bash
@@ -41,11 +52,11 @@ app/
 │   ├── config.py        # Pydantic-settings (env vars / .env)
 │   └── database.py      # SQLAlchemy engine, SessionLocal, Base
 ├── models/
-│   └── ledger.py        # ORM: Tenant, Account, JournalEntry, JournalLine
+│   └── ledger.py        # ORM: Tenant, Organization, Branch, Account, JournalEntry, JournalLine
 ├── schemas/
 │   └── ledger.py        # Pydantic v2 DTOs with double-entry validator
 ├── services/
-│   ├── ledger_service.py    # Core engine: SELECT FOR UPDATE, balance updates
+│   ├── ledger_service.py    # Core engine: SELECT FOR UPDATE, balance updates, hierarchy helpers
 │   ├── reporting_service.py # Trial balance, balance sheet, statutory reports
 │   ├── invoicing_service.py # AR/AP, invoice to journal entry posting
 │   ├── banking_service.py   # Bank statement import and reconciliation
@@ -58,6 +69,8 @@ app/
 │   └── in_gst.py        # India GST (CGST/SGST/IGST) + RBI FX + GSTR-1
 └── api/v1/
     ├── tenants.py        # POST/GET /api/v1/tenants/
+    ├── organizations.py  # POST/GET /api/v1/organizations/
+    ├── branches.py       # POST/GET /api/v1/branches/
     ├── accounts.py       # POST/GET /api/v1/accounts/
     ├── journal_entries.py # POST/GET /api/v1/journal-entries/ + /reverse
     ├── reports.py        # GET /api/v1/reports/trial-balance|balance-sheet|statutory
@@ -76,7 +89,8 @@ app/
 | Double-entry | Schema `model_validator` + service layer guard |
 | Immutability | Entries never deleted; reversal entries negate originals |
 | Concurrency | `SELECT ... FOR UPDATE` on Account rows per transaction |
-| Multi-tenancy | All entities scoped by `tenant_id` with FK enforcement |
+| Multi-tenancy | Tenant, organization, and branch scopes are modeled explicitly with FK-backed hierarchy |
+| Request context | Request headers can inject `x-tenant-id`, `x-organization-id`, and `x-branch-id` into the request state |
 | Plugin system | `LocalizationPlugin` ABC + `PluginRegistry` singleton |
 | Test isolation | Each test rolls back via SQLAlchemy SAVEPOINT |
 
@@ -87,6 +101,10 @@ app/
 | GET | `/health` | System health + plugin list |
 | POST | `/api/v1/tenants/` | Create tenant |
 | GET | `/api/v1/tenants/` | List tenants |
+| POST | `/api/v1/organizations/` | Create organization under a tenant |
+| GET | `/api/v1/organizations/tenant/{tenant_id}` | List organizations for a tenant |
+| POST | `/api/v1/branches/` | Create branch under an organization |
+| GET | `/api/v1/branches/organization/{organization_id}` | List branches for an organization |
 | POST | `/api/v1/accounts/` | Create account |
 | GET | `/api/v1/accounts/tenant/{id}` | List CoA for tenant |
 | POST | `/api/v1/journal-entries/?plugin_id=in_gst` | Post journal entry |

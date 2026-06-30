@@ -20,7 +20,16 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.ledger import Account, AccountType, EntryStatus, JournalEntry, JournalLine, Tenant
+from app.models.ledger import (
+    Account,
+    AccountType,
+    Branch,
+    EntryStatus,
+    JournalEntry,
+    JournalLine,
+    Organization,
+    Tenant,
+)
 from app.plugins.base import PluginContext, PluginRegistry
 from app.schemas.ledger import (
     AccountCreate,
@@ -51,6 +60,18 @@ class ClosedPeriodError(Exception):
 class TenantNotFoundError(Exception):
     def __init__(self, tenant_id: str):
         super().__init__(f"Tenant {tenant_id!r} not found.")
+
+
+class OrganizationNotFoundError(Exception):
+    def __init__(self, organization_id: str):
+        super().__init__(f"Organization {organization_id!r} not found.")
+
+
+class BranchCodeConflictError(Exception):
+    def __init__(self, code: str, organization_id: str):
+        super().__init__(
+            f"Branch code {code!r} already exists for organization {organization_id!r}."
+        )
 
 
 class AccountNotFoundError(Exception):
@@ -106,6 +127,79 @@ def get_tenant(db: Session, tenant_id: uuid.UUID) -> Tenant:
 
 def list_tenants(db: Session, skip: int = 0, limit: int = 100) -> List[Tenant]:
     return db.execute(select(Tenant).offset(skip).limit(limit)).scalars().all()
+
+
+def create_organization(db: Session, payload) -> Organization:
+    """Create a legal organization beneath a tenant."""
+    tenant = db.get(Tenant, payload.tenant_id)
+    if not tenant:
+        raise TenantNotFoundError(str(payload.tenant_id))
+
+    organization = Organization(
+        tenant_id=payload.tenant_id,
+        name=payload.name,
+        country_code=payload.country_code.upper(),
+        base_currency=payload.base_currency.upper(),
+    )
+    db.add(organization)
+    db.commit()
+    db.refresh(organization)
+    return organization
+
+
+def list_organizations(db: Session, tenant_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[Organization]:
+    return (
+        db.execute(
+            select(Organization)
+            .where(Organization.tenant_id == tenant_id)
+            .order_by(Organization.name)
+            .offset(skip)
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )
+
+
+def create_branch(db: Session, payload) -> Branch:
+    """Create a branch or sub-business under an organization."""
+    organization = db.get(Organization, payload.organization_id)
+    if not organization:
+        raise OrganizationNotFoundError(str(payload.organization_id))
+
+    existing = db.execute(
+        select(Branch).where(
+            Branch.organization_id == payload.organization_id,
+            Branch.code == payload.code.upper(),
+        )
+    ).scalar_one_or_none()
+    if existing:
+        raise BranchCodeConflictError(payload.code.upper(), str(payload.organization_id))
+
+    branch = Branch(
+        tenant_id=organization.tenant_id,
+        organization_id=payload.organization_id,
+        name=payload.name,
+        code=payload.code.upper(),
+    )
+    db.add(branch)
+    db.commit()
+    db.refresh(branch)
+    return branch
+
+
+def list_branches(db: Session, organization_id: uuid.UUID, skip: int = 0, limit: int = 100) -> List[Branch]:
+    return (
+        db.execute(
+            select(Branch)
+            .where(Branch.organization_id == organization_id)
+            .order_by(Branch.code)
+            .offset(skip)
+            .limit(limit)
+        )
+        .scalars()
+        .all()
+    )
 
 
 # ── Account Service ───────────────────────────────────────────────────────────
