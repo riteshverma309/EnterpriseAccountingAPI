@@ -2,10 +2,11 @@
 app/api/v1/fx.py
 Endpoints for Multi-Currency FX Revaluation.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.core.auth import ScopeError, validate_scope
 from app.schemas.fx import (
     ExchangeRateCreate,
     ExchangeRateRead,
@@ -25,13 +26,18 @@ router = APIRouter(prefix="/fx", tags=["Multi-Currency FX"])
     summary="Set an exchange rate for a date",
 )
 def set_exchange_rate(
+    request: Request,
     payload: ExchangeRateCreate,
     db: Session = Depends(get_db_session),
 ) -> ExchangeRateRead:
     try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
         rate = fx_service.set_exchange_rate(db, payload)
     except TenantNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     return ExchangeRateRead.model_validate(rate)
 
 
@@ -42,10 +48,13 @@ def set_exchange_rate(
     summary="Run Month-End FX Revaluation",
 )
 def run_fx_revaluation(
+    request: Request,
     payload: FxRevaluationRequest,
     db: Session = Depends(get_db_session),
 ) -> FxRevaluationResponse:
     try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
         result = fx_service.run_fx_revaluation(db, payload)
     except TenantNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
@@ -54,5 +63,7 @@ def run_fx_revaluation(
     except AccountNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except ClosedPeriodError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ScopeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     return FxRevaluationResponse.model_validate(result)

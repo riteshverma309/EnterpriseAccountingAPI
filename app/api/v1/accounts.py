@@ -5,10 +5,11 @@ Chart of Accounts (CoA) management endpoints.
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_session
+from app.api.deps import get_db_session, require_editor_role
+from app.core.auth import ScopeError, validate_scope
 from app.schemas.ledger import AccountCreate, AccountRead
 from app.services import ledger_service
 from app.services.ledger_service import (
@@ -27,8 +28,10 @@ router = APIRouter(prefix="/accounts", tags=["Chart of Accounts"])
     summary="Create a Chart of Accounts entry",
 )
 def create_account(
+    request: Request,
     payload: AccountCreate,
     db: Session = Depends(get_db_session),
+    current_user: dict = Depends(require_editor_role),
 ) -> AccountRead:
     """
     Create a new account in the Chart of Accounts.
@@ -36,6 +39,8 @@ def create_account(
     Account codes must be unique within a tenant.
     """
     try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
         account = ledger_service.create_account(db, payload)
     except TenantNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
@@ -43,6 +48,8 @@ def create_account(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except AccountCodeConflictError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     return AccountRead.model_validate(account)
 
 

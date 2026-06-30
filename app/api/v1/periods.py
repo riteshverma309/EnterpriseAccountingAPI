@@ -5,11 +5,12 @@ Endpoints for Fiscal Periods.
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.core.auth import ScopeError, validate_scope
 from app.models.periods import FiscalPeriod
 from app.models.ledger import Tenant
 from app.schemas.periods import FiscalPeriodCreate, FiscalPeriodRead, FiscalPeriodUpdate
@@ -24,9 +25,16 @@ router = APIRouter(prefix="/periods", tags=["Fiscal Periods"])
     summary="Create a new fiscal period",
 )
 def create_period(
+    request: Request,
     payload: FiscalPeriodCreate,
     db: Session = Depends(get_db_session),
 ) -> FiscalPeriodRead:
+    try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
+    except ScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+
     tenant = db.get(Tenant, payload.tenant_id)
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
@@ -50,11 +58,19 @@ def create_period(
     summary="Update a fiscal period (Close/Open)",
 )
 def update_period(
+    request: Request,
     period_id: uuid.UUID,
     payload: FiscalPeriodUpdate,
     db: Session = Depends(get_db_session),
 ) -> FiscalPeriodRead:
-    period = db.get(FiscalPeriod, period_id)
+    try:
+        context = getattr(request.state, "context", {})
+        period = db.get(FiscalPeriod, period_id)
+        if period:
+            validate_scope(context, tenant_id=str(period.tenant_id))
+    except ScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+
     if not period:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Period not found")
         

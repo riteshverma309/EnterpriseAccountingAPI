@@ -5,10 +5,11 @@ Endpoints for Bank Reconciliation.
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.core.auth import ScopeError, validate_scope
 from app.schemas.banking import (
     BankStatementCreate,
     BankStatementRead,
@@ -28,15 +29,20 @@ router = APIRouter(prefix="/banking", tags=["Bank Reconciliation"])
     summary="Import a bank statement",
 )
 def import_bank_statement(
+    request: Request,
     payload: BankStatementCreate,
     db: Session = Depends(get_db_session),
 ) -> BankStatementRead:
     try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
         statement = banking_service.import_bank_statement(db, payload)
     except TenantNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except AccountNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     return BankStatementRead.model_validate(statement)
 
 
@@ -62,11 +68,16 @@ def list_bank_statements(
     summary="Reconcile a bank statement line with a journal entry line",
 )
 def reconcile_line(
+    request: Request,
     payload: BankReconciliationCreate,
     db: Session = Depends(get_db_session),
 ) -> BankReconciliationRead:
     try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
         recon = banking_service.reconcile_line(db, payload)
     except banking_service.ReconciliationError as exc:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
+    except ScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     return BankReconciliationRead.model_validate(recon)

@@ -5,10 +5,11 @@ Journal entry posting, retrieval, and reversal endpoints.
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_session
+from app.api.deps import get_current_user, get_db_session
+from app.core.auth import ScopeError, validate_scope
 from app.schemas.ledger import JournalEntryCreate, JournalEntryRead, JournalEntryReverseRequest
 from app.services import ledger_service
 from app.services.ledger_service import (
@@ -31,6 +32,7 @@ router = APIRouter(prefix="/journal-entries", tags=["Journal Entries"])
     summary="Post a double-entry journal entry",
 )
 def post_journal_entry(
+    request: Request,
     payload: JournalEntryCreate,
     plugin_id: Optional[str] = Query(
         None,
@@ -38,6 +40,7 @@ def post_journal_entry(
         examples=["in_gst"],
     ),
     db: Session = Depends(get_db_session),
+    current_user: str = Depends(get_current_user),
 ) -> JournalEntryRead:
     """
     Post a multi-line double-entry journal entry to the ledger.
@@ -52,6 +55,8 @@ def post_journal_entry(
     localization hooks (tax computation, statutory metadata enrichment).
     """
     try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
         entry = ledger_service.post_journal_entry(db, payload, plugin_id=plugin_id)
     except TenantNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
@@ -62,6 +67,8 @@ def post_journal_entry(
     except UnbalancedLedgerError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
     except ClosedPeriodError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ScopeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

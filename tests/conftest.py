@@ -16,6 +16,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
 
+from app.core.auth import create_access_token
 from app.core.config import settings
 from app.core.database import Base
 from app.main import app
@@ -84,19 +85,29 @@ def client(db: Session) -> TestClient:
 
 # ── Reusable Data Fixtures ────────────────────────────────────────────────────
 @pytest.fixture()
-def sample_tenant(client: TestClient) -> dict:
+def auth_headers() -> dict:
+    token = create_access_token("test-actor", role="accountant")
+    return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture()
+def sample_tenant(client: TestClient, auth_headers: dict) -> dict:
     """Creates and returns a sample tenant via the API."""
-    resp = client.post("/api/v1/tenants/", json={
-        "name": "Test Corp",
-        "base_currency": "USD",
-        "fiscal_year_start_month": 1,
-    })
+    resp = client.post(
+        "/api/v1/tenants/",
+        headers=auth_headers,
+        json={
+            "name": "Test Corp",
+            "base_currency": "USD",
+            "fiscal_year_start_month": 1,
+        },
+    )
     assert resp.status_code == 201, resp.text
     return resp.json()
 
 
 @pytest.fixture()
-def sample_accounts(client: TestClient, sample_tenant: dict) -> dict:
+def sample_accounts(client: TestClient, sample_tenant: dict, auth_headers: dict) -> dict:
     """
     Creates a minimal Chart of Accounts for double-entry tests:
     - 1010: Cash (ASSET)
@@ -115,13 +126,17 @@ def sample_accounts(client: TestClient, sample_tenant: dict) -> dict:
         ("5000", "Operating Expenses", "EXPENSE"),
     ]
     for code, name, atype in specs:
-        resp = client.post("/api/v1/accounts/", json={
-            "tenant_id": tenant_id,
-            "code": code,
-            "name": name,
-            "account_type": atype,
-            "currency": "USD",
-        })
+        resp = client.post(
+            "/api/v1/accounts/",
+            headers=auth_headers,
+            json={
+                "tenant_id": tenant_id,
+                "code": code,
+                "name": name,
+                "account_type": atype,
+                "currency": "USD",
+            },
+        )
         assert resp.status_code == 201, f"Failed to create account {code}: {resp.text}"
         accounts[code] = resp.json()
     return accounts

@@ -1,5 +1,10 @@
 [
   "tests/test_assets.py::TestFixedAssets::test_create_and_depreciate_asset",
+  "tests/test_audit.py::test_write_audit_event_appends_log_entry",
+  "tests/test_auth.py::test_accountant_role_can_create_account",
+  "tests/test_auth.py::test_create_and_validate_access_token",
+  "tests/test_auth.py::test_invalid_token_raises",
+  "tests/test_auth.py::test_viewer_role_cannot_create_account",
   "tests/test_banking.py::TestBankReconciliation::test_import_bank_statement_and_reconcile",
   "tests/test_banking.py::TestBankReconciliation::test_reconcile_with_mismatched_amount_returns_409",
   "tests/test_extended_scenarios.py::test_coa_hierarchical_combinations[ACC0001-Account 1-LIABILITY-True]",
@@ -712,5 +717,12 @@
   "tests/test_plugins.py::TestUSGAAPPlugin::test_us_gaap_plugin_display_name",
   "tests/test_plugins.py::TestUSGAAPPlugin::test_usd_fx_same_currency",
   "tests/test_plugins.py::TestUSGAAPPlugin::test_usd_fx_unsupported_pair_raises",
-  "tests/test_plugins.py::TestUSGAAPPlugin::test_usd_fx_usd_to_eur"
+  "tests/test_plugins.py::TestUSGAAPPlugin::test_usd_fx_usd_to_eur",
+  "tests/test_scope.py::test_scope_validation_allows_matching_context",
+  "tests/test_scope.py::test_scope_validation_rejects_mismatch",
+  "tests/test_scope_enforcement.py::test_account_creation_rejects_scope_mismatch",
+  "tests/test_scope_enforcement.py::test_branch_creation_rejects_scope_mismatch",
+  "tests/test_scope_enforcement.py::test_journal_entry_creation_rejects_scope_mismatch",
+  "tests/test_scope_enforcement.py::test_organization_creation_rejects_scope_mismatch",
+  "tests/test_scope_enforcement.py::test_period_creation_rejects_scope_mismatch"
 ]

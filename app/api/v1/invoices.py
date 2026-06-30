@@ -5,10 +5,11 @@ Endpoints for Invoices and Bills.
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.core.auth import ScopeError, validate_scope
 from app.schemas.invoicing import InvoiceCreate, InvoiceRead
 from app.services import invoicing_service
 from app.services.invoicing_service import (
@@ -28,15 +29,20 @@ router = APIRouter(prefix="/invoices", tags=["Invoices (AR/AP)"])
     summary="Create a new invoice or bill",
 )
 def create_invoice(
+    request: Request,
     payload: InvoiceCreate,
     db: Session = Depends(get_db_session),
 ) -> InvoiceRead:
     try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
         invoice = invoicing_service.create_invoice(db, payload)
     except TenantNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except PartyNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     return InvoiceRead.model_validate(invoice)
 
 
@@ -46,6 +52,7 @@ def create_invoice(
     summary="Post an invoice to the general ledger",
 )
 def post_invoice(
+    request: Request,
     invoice_id: uuid.UUID,
     ar_ap_account_id: uuid.UUID,
     db: Session = Depends(get_db_session),
@@ -56,7 +63,9 @@ def post_invoice(
     For a Bill (AP): Credits the provided ar_ap_account_id, Debits line items.
     """
     try:
+        context = getattr(request.state, "context", {})
         invoice = invoicing_service.post_invoice(db, invoice_id, ar_ap_account_id)
+        validate_scope(context, tenant_id=str(invoice.tenant_id))
     except InvoiceNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except InvoiceAlreadyPostedError as exc:
@@ -64,6 +73,8 @@ def post_invoice(
     except UnbalancedLedgerError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
     except ClosedPeriodError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
+    except ScopeError as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     return InvoiceRead.model_validate(invoice)
 

@@ -34,6 +34,24 @@ curl -X GET http://localhost:8000/health \
   -H "x-branch-id: <branch-id>"
 ```
 
+### Scope enforcement
+
+Write operations now validate the incoming tenant context before proceeding. If a request attempts to create or update data for a tenant different from the supplied scope headers, the API returns HTTP 403 and the write is rejected.
+
+### Role-based authorization
+
+The API now supports simple role-based authorization for write operations. Tokens can carry a role, and only `accountant` and `admin` roles are permitted to create or modify accounting data.
+
+```bash
+# Example: create a token for an accountant user
+# The token format is signed and opaque; the role is embedded in the payload.
+```
+
+Roles:
+- `viewer`: read-only access
+- `accountant`: can create/update accounting records
+- `admin`: same write permissions as accountant, reserved for administrative use
+
 ## Running Tests
 
 ```bash
@@ -41,6 +59,7 @@ curl -X GET http://localhost:8000/health \
 # CREATE DATABASE enterprise_accounting_test;
 
 source venv/bin/activate
+pytest tests/test_scope_enforcement.py -q
 pytest tests/ -v
 ```
 

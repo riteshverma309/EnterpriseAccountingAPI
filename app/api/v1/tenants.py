@@ -8,7 +8,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db_session
+from app.api.deps import get_current_user, get_db_session
 from app.schemas.ledger import TenantCreate, TenantRead
 from app.services import ledger_service
 from app.services.ledger_service import TenantNotFoundError
@@ -25,12 +25,13 @@ router = APIRouter(prefix="/tenants", tags=["Tenants"])
 def create_tenant(
     payload: TenantCreate,
     db: Session = Depends(get_db_session),
+    current_user: str = Depends(get_current_user),
 ) -> TenantRead:
     """
     Create a new accounting tenant (legal entity / business unit).
     Each tenant has an isolated Chart of Accounts and ledger.
     """
-    tenant = ledger_service.create_tenant(db, payload)
+    tenant = ledger_service.create_tenant(db, payload, actor=current_user)
     return TenantRead.model_validate(tenant)
 
 
@@ -43,6 +44,7 @@ def list_tenants(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db_session),
+    current_user: str = Depends(get_current_user),
 ) -> List[TenantRead]:
     tenants = ledger_service.list_tenants(db, skip=skip, limit=limit)
     return [TenantRead.model_validate(t) for t in tenants]
@@ -56,6 +58,7 @@ def list_tenants(
 def get_tenant(
     tenant_id: uuid.UUID,
     db: Session = Depends(get_db_session),
+    current_user: str = Depends(get_current_user),
 ) -> TenantRead:
     try:
         tenant = ledger_service.get_tenant(db, tenant_id)

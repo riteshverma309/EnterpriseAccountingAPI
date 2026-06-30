@@ -20,6 +20,7 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.audit import write_audit_event
 from app.models.ledger import (
     Account,
     AccountType,
@@ -105,7 +106,7 @@ class InactiveAccountError(Exception):
 
 # ── Tenant Service ────────────────────────────────────────────────────────────
 
-def create_tenant(db: Session, payload: TenantCreate) -> Tenant:
+def create_tenant(db: Session, payload: TenantCreate, actor: str = "system") -> Tenant:
     """Create a new tenant (accounting entity)."""
     tenant = Tenant(
         name=payload.name,
@@ -115,6 +116,7 @@ def create_tenant(db: Session, payload: TenantCreate) -> Tenant:
     db.add(tenant)
     db.commit()
     db.refresh(tenant)
+    write_audit_event("create", "tenant", {"tenant_id": str(tenant.id), "name": tenant.name}, user=actor)
     return tenant
 
 

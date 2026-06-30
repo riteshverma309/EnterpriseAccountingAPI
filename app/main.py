@@ -15,7 +15,7 @@ import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -158,6 +158,7 @@ async def already_reversed_handler(request: Request, exc: EntryAlreadyReversedEr
 
 # ── Include API Routers ───────────────────────────────────────────────────────
 from app.api.v1.router import api_router  # noqa: E402
+from app.api.deps import get_current_user  # noqa: E402
 
 app.include_router(api_router, prefix="/api/v1")
 
@@ -174,7 +175,7 @@ async def request_context_middleware(request: Request, call_next):
 
 
 @app.get("/health", tags=["System"], summary="System health check")
-async def health_check(request: Request):
+async def health_check(request: Request, current_user: str = Depends(get_current_user)):
     """Returns operational status and registered plugin list."""
     from app.plugins.base import PluginRegistry
     db_ok = ping_db()

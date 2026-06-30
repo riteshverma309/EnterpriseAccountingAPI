@@ -5,10 +5,11 @@ Organization-level hierarchy endpoints.
 import uuid
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db_session
+from app.core.auth import ScopeError, validate_scope
 from app.schemas.ledger import OrganizationCreate, OrganizationRead
 from app.services import ledger_service
 from app.services.ledger_service import TenantNotFoundError
@@ -23,13 +24,18 @@ router = APIRouter(prefix="/organizations", tags=["Organizations"])
     summary="Create a legal organization",
 )
 def create_organization(
+    request: Request,
     payload: OrganizationCreate,
     db: Session = Depends(get_db_session),
 ) -> OrganizationRead:
     try:
+        context = getattr(request.state, "context", {})
+        validate_scope(context, tenant_id=str(payload.tenant_id))
         organization = ledger_service.create_organization(db, payload)
     except TenantNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except ScopeError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     return OrganizationRead.model_validate(organization)
 
 
